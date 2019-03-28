@@ -21,11 +21,14 @@ public class TerrainGenerator : MonoBehaviour
     public Vector3 viewerPosition;
     Vector3 oldViewerPosition;
     public Material material;
+    public AnimationCurve lodCurve;
+
+    static public SimpleNoiseFilter simpleNoise;
 
     [HideInInspector]
     //public readonly int[] resolutionsLevels = {240, 120, 60, 30, 15};
-    public readonly int[] resolutionsLevels = { 10, 5, 5, 5};
-    //public readonly int[] resolutionsLevels = { 60, 30, 15, 5 };
+    //public readonly int[] resolutionsLevels = { 10, 5, 5, 5};
+    public readonly int[] resolutionsLevels = {120, 60, 30, 15 };
     public float[] lodThresholdsLevels;
 
     Dictionary<Vector2, TerrainFragment> visibleLastframeFragments;
@@ -59,6 +62,7 @@ public class TerrainGenerator : MonoBehaviour
 
     public void Initialize()
     {
+        simpleNoise =  (SimpleNoiseFilter)NoiseFilterFactory.CreateNoiseFilter(terrainSettings.noiseLayers[0].noiseSettings);
         fragmentObjPool = new FragmentObjectPool(material, transform);
         viewerPosition = viewer.transform.position;
         visibleFragments = new Dictionary<Vector2, TerrainFragment>();
@@ -92,6 +96,7 @@ public class TerrainGenerator : MonoBehaviour
                 Vector2 viewedFragmentCoord = new Vector2(currentFragmentCoordX + xOffset, currentFragmentCoordY + yOffset);
                 TerrainFragment existingFragment;
                 //need to check for lod level 
+                //AnimationCurve lodCurveInfo = new AnimationCurve(lodCurve.keys);
                 LodInfos lodInfo = new LodInfos(viewedFragmentCoord, terrainSettings, lodThresholdsLevels, viewerPosition);
 
                 if (visibleLastframeFragments.TryGetValue(viewedFragmentCoord, out existingFragment)){
@@ -135,16 +140,18 @@ public class TerrainGenerator : MonoBehaviour
 
         lodThresholdsLevels = new float[resolutionsLevels.Length];
         for(int i = 0; i < resolutionsLevels.Length; i++) {
-            float step = terrainSettings.maxViewDistance / resolutionsLevels.Length;
-            float percentDistance = (i+1) * step;
-            lodThresholdsLevels[i] = percentDistance;
+            float curveValue = lodCurve.Evaluate(i / (float)resolutionsLevels.Length);
+            lodThresholdsLevels[i] = curveValue * terrainSettings.maxViewDistance;
         }
     }
 
     void GenerateEditorFragment(TerrainFragment fragment, LodInfos lodInfo) {
         //in editor stuff
-        fragment.BuildMesh();
         GameObject fragmentObj = new GameObject();
+        fragment.gameObject = fragmentObj;
+
+        fragment.BuildMesh();
+        fragment.BuildMeshData();
 
         fragmentObj.name = "Fragment lod " + lodInfo.lodLevel + " center " + lodInfo.center;
         MeshRenderer meshRenderer = fragmentObj.AddComponent<MeshRenderer>();
@@ -167,19 +174,8 @@ public class TerrainGenerator : MonoBehaviour
 
     public void OnTerrainSettingsChanged()
     {
-
+        Initialize();
     }
-
-    //public void RequesTerrainFragmentData(TerrainFragment fragment, Action<FragmentMeshData> callback)
-    //{
-    //    ThreadStart start = delegate
-    //    {
-    //        FragmentDataThread(fragment, callback);
-    //    };
-
-    //    new Thread(start).Start();
-    //}
-
 
     void FragmentDataThread(TerrainFragment fragment, Action<FragmentMeshData> callback)
     {
@@ -203,11 +199,14 @@ public class TerrainGenerator : MonoBehaviour
 
         mesh.vertices = fragmentMeshData.vertices;
         mesh.triangles = fragmentMeshData.triangles;
-        mesh.RecalculateNormals();
 
+        mesh.RecalculateNormals();
+        //mesh.normals = fragmentMeshData.normals;
         TerrainFragment terrainFragment;
         visibleFragments.TryGetValue(fragmentMeshData.lodInfos.coords, out terrainFragment);
         terrainFragment.gameObject = fragmentObj;
+        if(fragmentMeshData.lodInfos.lodLevel == 0)
+            fragmentObj.AddComponent<MeshCollider>();
     }
 
     public struct ThreadTaskCallback<T>
@@ -221,58 +220,6 @@ public class TerrainGenerator : MonoBehaviour
             this.parameter = parameter;
         }
     }
-}
-
-public class LodInfos{
-    public Vector2 center { get; private set; } //position
-    public Vector2 coords;
-
-    TerrainSettings terrainSettings;
-    Vector3 viewerPosition;
-    float[] lodThresholdsLevels;
-
-    public int lodLevel { private set; get; }
-    public int bSideLodLevel { private set; get; }
-    public int rSideLodLevel { private set; get; }
-
-
-    public LodInfos(Vector2 coords, TerrainSettings terrainSettings, float[] lodThresholdsLevels, Vector3 viewerPosition) {
-        this.viewerPosition = viewerPosition;
-        this.lodThresholdsLevels = lodThresholdsLevels;
-        this.coords = coords;
-        this.terrainSettings = terrainSettings;
-
-        center = coords * terrainSettings.fragmentSize;
-
-        lodLevel = getLodLevel(center);
-        rSideLodLevel = getLodLevel(center + Vector2.right * terrainSettings.fragmentSize); //refactor needed for planet axisA & axsisB 
-        bSideLodLevel = getLodLevel(center + Vector2.down * terrainSettings.fragmentSize);
-    }
-
-    public int getLodLevel(Vector2 center) {
-
-        //probleme with how lod is calculated and updated for fragments
-        Bounds bounds = new Bounds(new Vector3(center.x, 0, center.y), Vector3.one * terrainSettings.fragmentSize);
-
-        float distance = Mathf.Sqrt(bounds.SqrDistance(viewerPosition));
-        //Debug.Log("Bounds " + center + " postion " + viewerPosition);
-
-        int lodLevel = 0;
-        for (int i = 0; i < lodThresholdsLevels.Length; i++) {
-            if (distance > lodThresholdsLevels[i]){
-                lodLevel = i;
-            }
-        }
-        return lodLevel;
-    }
-
-    public static bool operator == (LodInfos a, LodInfos b) {
-        return a.lodLevel == b.lodLevel && a.rSideLodLevel == b.rSideLodLevel && a.bSideLodLevel == b.bSideLodLevel;
-    }
-
-    public static bool operator != (LodInfos a , LodInfos b) {
-        return !(a == b);
-     }
 }
 
 
