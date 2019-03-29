@@ -27,7 +27,7 @@ public class TerrainGenerator : MonoBehaviour
 
     [HideInInspector]
     //public readonly int[] resolutionsLevels = {240, 120, 60, 30, 15};
-    //public readonly int[] resolutionsLevels = { 10, 5, 5, 5};
+    //public readonly int[] resolutionsLevels = { 30, 10, 5};
     public readonly int[] resolutionsLevels = {120, 60, 30, 15 };
     public float[] lodThresholdsLevels;
 
@@ -151,7 +151,6 @@ public class TerrainGenerator : MonoBehaviour
         fragment.gameObject = fragmentObj;
 
         fragment.BuildMesh();
-        fragment.BuildMeshData();
 
         fragmentObj.name = "Fragment lod " + lodInfo.lodLevel + " center " + lodInfo.center;
         MeshRenderer meshRenderer = fragmentObj.AddComponent<MeshRenderer>();
@@ -172,9 +171,14 @@ public class TerrainGenerator : MonoBehaviour
         Initialize();
     }
 
+    public void DeleteChildrenTerrain() {
+        for (int i = 0; i < transform.childCount; i++) //destroy editor terrain fragments
+            DestroyImmediate(transform.GetChild(i).gameObject);
+    }
+
     public void OnTerrainSettingsChanged()
     {
-        Initialize();
+        //Initialize();
     }
 
     void FragmentDataThread(TerrainFragment fragment, Action<FragmentMeshData> callback)
@@ -189,24 +193,24 @@ public class TerrainGenerator : MonoBehaviour
 
     private void OnFragmentDataRecived(FragmentMeshData fragmentMeshData)
     {
+        //tell neigbords to recalculate normals
         GameObject fragmentObj = fragmentObjPool.Acquire();
         fragmentObj.name = "Fragment lod " +fragmentMeshData.lodInfos.lodLevel + " center " + fragmentMeshData.lodInfos.center;
 
         Mesh mesh = fragmentObjPool.meshPool.Acquire();
-
         MeshFilter meshFilter = fragmentObj.GetComponent<MeshFilter>();
         meshFilter.sharedMesh = mesh;
 
-        mesh.vertices = fragmentMeshData.vertices;
-        mesh.triangles = fragmentMeshData.triangles;
 
-        mesh.RecalculateNormals();
-        //mesh.normals = fragmentMeshData.normals;
         TerrainFragment terrainFragment;
         visibleFragments.TryGetValue(fragmentMeshData.lodInfos.coords, out terrainFragment);
+        UpdateNeighborsNormals(fragmentMeshData.lodInfos.coords, terrainFragment); //need a better check if lod exists
+
+        mesh.vertices = fragmentMeshData.vertices;
+        mesh.triangles = fragmentMeshData.triangles;
+        mesh.normals = fragmentMeshData.normals;
+
         terrainFragment.gameObject = fragmentObj;
-        if(fragmentMeshData.lodInfos.lodLevel == 0)
-            fragmentObj.AddComponent<MeshCollider>();
     }
 
     public struct ThreadTaskCallback<T>
@@ -218,6 +222,38 @@ public class TerrainGenerator : MonoBehaviour
         {
             this.callback = callback;
             this.parameter = parameter;
+        }
+    }
+
+    void UpdateNeighborsNormals(Vector2 coords, TerrainFragment fragment) {
+        Vector2 upCoords = coords + Vector2.up;
+        Vector2 downCoords = coords + Vector2.down;
+        Vector2 rightCoords = coords + Vector2.right;
+        Vector2 leftCoords = coords + Vector2.left;
+
+        TerrainFragment up;
+        TerrainFragment down;
+        TerrainFragment right;
+        TerrainFragment left;
+
+        if(visibleFragments.TryGetValue(upCoords, out up)){
+            //if(up.gameObject.active)
+                fragment.RecalculateNormalsUp(up);
+        }
+        if (visibleFragments.TryGetValue(downCoords, out down))
+        {
+            //if (down.gameObject.active)
+                fragment.RecalculateNormalsDown(down);
+        }
+        if (visibleFragments.TryGetValue(rightCoords, out right))
+        {
+            //if (right.gameObject.active)
+                fragment.RecalculateNormalsRight(right);
+        }
+        if (visibleFragments.TryGetValue(leftCoords, out left))
+        {
+            //if (up.gameObject.active)
+                fragment.RecalculateNormalsLeft(left);
         }
     }
 }

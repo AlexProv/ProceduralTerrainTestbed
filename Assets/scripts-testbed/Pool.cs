@@ -79,3 +79,23 @@ public class FragmentObjectPool : Pool<GameObject> {
         return obj;
     }
 }
+
+public class ListPool<T> : Pool<List<T>>
+{
+
+    public void Recover(List<T> elem)
+    {
+        base.Recover(elem);
+        elem.Clear();
+    }
+}
+
+public class ArrayListPool : Pool<ArrayList>
+{
+
+    public void Recover(ArrayList elem)
+    {
+        base.Recover(elem);
+        elem.Clear();
+    }
+}

@@ -1,19 +1,30 @@
-﻿using System.Collections;
+﻿
 using System.Collections.Generic;
 using UnityEngine;
-using System;
-using System.Threading;
+
 
 public class TerrainFragment{
     public LodInfos lodInfos;
     TerrainGenerator terrain;
 
-    //ShapeGenerator shapeGenerator;
     Vector3 axisA, axisB, localUp;
     public Mesh mesh;
     public MeshFilter meshFilter;
     public bool isVisible = true;
     public GameObject gameObject;
+
+    int triIndex = 0;
+    public Vector3[] normals;
+    public Vector3 vertices;
+    public int[] triangles;
+    public int resolutionUp;
+    public int resolutionRight;
+    public int resolution;
+
+    int[] upIndexes;
+    int[] downIndexes;
+    int[] rightIndexes;
+    int[] leftIndexes;
 
     public TerrainFragment(LodInfos lodInfos, Vector3 localUp, TerrainGenerator terrain){
         this.lodInfos = lodInfos;
@@ -22,45 +33,7 @@ public class TerrainFragment{
     }
 
     public void BuildMesh() {
-        //mesh = TerrainGenerator.fragmentObjPoll.meshPool.Acquire();
         mesh = new Mesh();
-
-        //int resolution = terrain.resolutionsLevels[lodInfos.lodLevel];
-        //Vector3[] vertices = new Vector3[resolution * resolution];
-        //int[] triangles = new int[(resolution - 1) * (resolution - 1) * 6];
-        //int triIndex = 0;
-
-        //for(int j = 0; j < resolution; j++) {
-        //    for(int i = 0; i < resolution; i++) {
-        //        int index = i + j * resolution;
-
-        //        float size = terrain.terrainSettings.fragmentSize;
-        //        float xpct = ((i / (resolution - 1.0f)) - 0.5f) * size;
-        //        float ypct = ((j / (resolution - 1.0f)) - 0.5f) * size;
-
-        //        float centerOffsetX = lodInfos.center.x;
-        //        float centerOffsetY = lodInfos.center.y;
-
-        //        Vector3 coords = new Vector3(xpct + centerOffsetX, 0 , ypct + centerOffsetY);
-        //        vertices[index] = coords;
-
-        //        if(i < resolution -1 && j < resolution - 1) {
-        //            triangles[triIndex] = index;
-        //            triangles[triIndex + 2] = index + resolution + 1;
-        //            triangles[triIndex + 1] = index + resolution;
-
-        //            triangles[triIndex + 3] = index;
-        //            triangles[triIndex + 5] = index + 1;
-        //            triangles[triIndex + 4] = index + resolution + 1;
-        //            triIndex += 6;
-        //        }
-        //    }
-        //}
-        //mesh.Clear();
-        //mesh.vertices = vertices;
-        //mesh.triangles = triangles;
-        //mesh.RecalculateNormals();
-
         FragmentMeshData test = BuildMeshData();
         mesh.Clear();
         mesh.vertices = test.vertices;
@@ -68,15 +41,13 @@ public class TerrainFragment{
         mesh.RecalculateNormals();
     }
 
-    void addTriangle(int a, int b, int c, ref int triIndex, int[] triangles, bool clockwise) {
-        if (clockwise)
-        {
+    void addTriangle(int a, int b, int c, int[] triangles, bool clockwise) {
+        if (clockwise){
             triangles[triIndex] = a;
             triangles[triIndex + 2] = b;
             triangles[triIndex + 1] = c;
         }
-        else
-        {
+        else{
             triangles[triIndex] = a;
             triangles[triIndex + 1] = b;
             triangles[triIndex + 2] = c;
@@ -84,70 +55,84 @@ public class TerrainFragment{
         triIndex += 3;
     }
 
-    public FragmentMeshData BuildMeshData() {
-        int max = 0;
-        #region setup
-        int resolution = terrain.resolutionsLevels[lodInfos.lodLevel];
-        int resolutionB = terrain.resolutionsLevels[lodInfos.bSideLodLevel];
-        int resolutionR = terrain.resolutionsLevels[lodInfos.rSideLodLevel];
-        //Vector3[] vertices = new Vector3[(resolution-1) * (resolution-1) * 2];
-        Vector3[] vertices = new Vector3[(resolution-1) * (resolution-1) + resolutionB + resolutionR];
 
-        //int[] triangles = new int[(resolution - 1) * (resolution - 1) * 6 + (((resolution * 2) + resolutionB + resolutionR - 4) * 3)];
-        int[] triangles = new int[((resolution - 2) * (resolution - 2) * 6) + ((resolution + resolutionR - 1) * 3) + ((resolution + resolutionB - 1) * 3)];
-        //List<int> triangles = new List<int>();
-        int triIndex = 0;
+    public FragmentMeshData BuildMeshData() {
+        #region setup
+        resolution = terrain.resolutionsLevels[lodInfos.lodLevel];
+        resolutionUp = terrain.resolutionsLevels[lodInfos.upSideLodLevel];
+        resolutionRight = terrain.resolutionsLevels[lodInfos.rightSideLodLevel];
+        List<int> upIndexesList = new List<int>();
+        List<int> rightIndexesList = new List<int>();
+        List<int> downIndexesList = new List<int>();
+        List<int> leftIndexesList = new List<int>();
+        //int resolutionDown = terrain.resolutionsLevels[lodInfos.downSideLodLevel];
+        //int resolutionLeft = terrain.resolutionsLevels[lodInfos.leftSideLodLevel];
+
+        Vector3[] vertices = new Vector3[(resolution-1) * (resolution-1) + resolutionUp + resolutionRight];
+        int[] triangles = new int[((resolution - 2) * (resolution - 2) * 6) + ((resolution + resolutionRight - 1) * 3) + ((resolution + resolutionUp - 1) * 3)];
         int index = 0;
 
-        List<int> rightIndexesList = new List<int>();
-        List<int> bottomIndexesList = new List<int>();
+        List<int> rightInnerIndexesList = new List<int>();
+        List<int> upInnerIndexesList = new List<int>();
+
+        float size = terrain.terrainSettings.fragmentSize;
         #endregion
+
 
         #region mainmesh
         for (int j = 0; j < resolution-1; j++){
             for (int i = 0; i < resolution -1; i++){
-                float size = terrain.terrainSettings.fragmentSize;
                 float xpct = ((i / (resolution - 1.0f)) - 0.5f) * size;
                 float ypct = ((j / (resolution - 1.0f)) - 0.5f) * size;
 
                 float centerOffsetX = lodInfos.center.x;
                 float centerOffsetY = lodInfos.center.y;
 
+
                 Vector3 coords = new Vector3(xpct + centerOffsetX, 0, ypct + centerOffsetY);
+                float height = TerrainGenerator.simpleNoise.Evaluate(coords);
+                coords.y = height;
+
                 vertices[index] = coords;
 
-                if( i == resolution - 2) {
-                    //add coords to right
-                    rightIndexesList.Add(index);
+                if ( i == resolution - 2) {
+                    rightInnerIndexesList.Add(index);
                 }
                 if( j == resolution -2)
                 {
-                    bottomIndexesList.Add(index);
+                    upInnerIndexesList.Add(index);
+                }
+                if (i == 0) {
+                    leftIndexesList.Add(index);
+                }
+                if (j == 0) {
+                    downIndexesList.Add(index);
                 }
 
                 if (i < resolution - 2 && j < resolution - 2){
-                    triangles[triIndex] = index + 1;
-                    triangles[triIndex + 1] = index;
-                    triangles[triIndex + 2] = index + resolution -1;
-
-                    triangles[triIndex + 3] = index + resolution -1;
-                    triangles[triIndex + 4] = index + resolution;
-                    triangles[triIndex + 5] = index + 1;
-                    triIndex += 6;
+                    addTriangle(index + 1,
+                                index,
+                                index + resolution - 1, 
+                        triangles, false);
+                    addTriangle(index + resolution - 1,
+                                index + resolution,
+                                index + 1,
+                        triangles, false);
                 }
                 index += 1;
             }
         }
+
+        downIndexesList.Add(index); //add last one to the down verts 
         #endregion
 
-        #region rightStrip 
-        int rSideResolution = terrain.resolutionsLevels[lodInfos.rSideLodLevel];
-        int[] bigIndexes = rightIndexesList.ToArray();
-        int[] smallIndexes = new int[rSideResolution];
 
-        for (int j = 0; j < rSideResolution; j++) {
-            float size = terrain.terrainSettings.fragmentSize;
-            float ypct = ((j / (rSideResolution - 1.0f)) - 0.5f) * size;
+        #region rightStrip 
+        int[] bigIndexes = rightInnerIndexesList.ToArray();
+        int[] smallIndexes = new int[resolutionRight];
+
+        for (int j = 0; j < resolutionRight; j++) {
+            float ypct = ((j / (resolutionRight - 1.0f)) - 0.5f) * size;
             float xpct = size / 2.0f;
 
             float centerOffsetX = lodInfos.center.x;
@@ -155,91 +140,81 @@ public class TerrainFragment{
 
             smallIndexes[j] = index;
 
-
             Vector3 coords = new Vector3(xpct + centerOffsetX, 0, ypct + centerOffsetY);
+            float height = TerrainGenerator.simpleNoise.Evaluate(coords);
+            coords.y = height;
+
             vertices[index] = coords;
+            rightIndexesList.Add(index);
             index += 1;
-            //GameObject dot = GameObject.CreatePrimitive(PrimitiveType.Sphere); // will crahs on play
-            //dot.transform.position = coords;
-            //dot.transform.parent = gameObject.transform;
         }
 
         bool clockwise = true;
-        int tri1 = 2;
-        int tri2 = 1;
         if (smallIndexes.Length > bigIndexes.Length)
         {
             int[] swaper = bigIndexes;
             bigIndexes = smallIndexes;
             smallIndexes = swaper;
             clockwise = false;
-            tri1 = 1;
-            tri2 = 2;
         }
 
         int step = (bigIndexes.Length+1)  / smallIndexes.Length;
         int smallIndex = 0;
-        int currentStepIndex = 0;
 
         for (int i = 0; i < bigIndexes.Length - 1; i++) {
-
-            //externe vers interne
-            triangles[triIndex] = bigIndexes[i];
-            triangles[triIndex + tri1] = smallIndexes[smallIndex];
-            triangles[triIndex + tri2] = bigIndexes[i + 1];
-            triIndex += 3;
+            addTriangle(bigIndexes[i],
+                        smallIndexes[smallIndex],
+                        bigIndexes[i + 1], 
+                triangles, clockwise);
             if (i % step == 0 && i != 0 && smallIndex < smallIndexes.Length - 1)
             {
-                //triangles[triIndex] = smallIndexes[smallIndex];
-                //triangles[triIndex + tri1] = smallIndexes[smallIndex + 1]; //explose si
-                //triangles[triIndex + tri2] = bigIndexes[i + 1];
-                //triIndex += 3;
-                addTriangle(smallIndexes[smallIndex], smallIndexes[smallIndex + 1], bigIndexes[i + 1],
-                 ref triIndex, triangles, clockwise);
+                addTriangle(smallIndexes[smallIndex],
+                            smallIndexes[smallIndex + 1],
+                            bigIndexes[i + 1],
+                 triangles, clockwise);
                 smallIndex += 1;
             }
         }
         if (clockwise) {
-            addTriangle(smallIndexes[smallIndexes.Length - 2], smallIndexes[smallIndexes.Length - 1], bigIndexes[bigIndexes.Length - 1],
-             ref triIndex, triangles, clockwise);
-            //triangles[triIndex] = smallIndexes[smallIndexes.Length - 2];
-            //triangles[triIndex + tri1] = smallIndexes[smallIndexes.Length-1]; //explose si
-            //triangles[triIndex + tri2] = bigIndexes[bigIndexes.Length -1];
-            //triIndex += 3;
+            addTriangle(smallIndexes[smallIndexes.Length - 2],
+                        smallIndexes[smallIndexes.Length - 1],
+                        bigIndexes[bigIndexes.Length - 1],
+             triangles, clockwise);
+        
         }
 
+        leftIndexesList.Add(index);
         #endregion
 
         #region bottomStrip
-        bigIndexes = bottomIndexesList.ToArray();
-        smallIndexes = new int[resolutionB];
+        bigIndexes = upInnerIndexesList.ToArray();
+        smallIndexes = new int[resolutionUp];
 
-        for (int j = 0; j < resolutionB; j++)
+        for (int j = 0; j < resolutionUp; j++)
         {
-            float size = terrain.terrainSettings.fragmentSize;
+
             float ypct = size / 2.0f;
-            float xpct = ((j / (resolutionB - 1.0f)) - 0.5f) * size;
+            float xpct = ((j / (resolutionUp - 1.0f)) - 0.5f) * size;
 
             float centerOffsetX = lodInfos.center.x;
             float centerOffsetY = lodInfos.center.y;
 
             smallIndexes[j] = index;
             Vector3 coords = new Vector3(xpct + centerOffsetX, 0, ypct + centerOffsetY);
+            float height = TerrainGenerator.simpleNoise.Evaluate(coords);
+            coords.y = height;
+
             vertices[index] = coords;
+            upIndexesList.Add(index);
             index += 1;
         }
 
         clockwise = true;
-        tri1 = 1;
-        tri2 = 2;
-        if (smallIndexes.Length > bigIndexes.Length)
-        {
+        if (smallIndexes.Length > bigIndexes.Length){
             int[] swaper = bigIndexes;
             bigIndexes = smallIndexes;
             smallIndexes = swaper;
             clockwise = false;
-            tri1 = 2;
-            tri2 = 1;
         }
 
         step = (bigIndexes.Length +1) / smallIndexes.Length;
@@ -247,79 +222,240 @@ public class TerrainFragment{
 
         for (int i = 0; i < bigIndexes.Length - 1; i++)
         {
-            triangles[triIndex] = bigIndexes[i];
-            triangles[triIndex + tri1] = smallIndexes[smallIndex];
-            triangles[triIndex + tri2] = bigIndexes[i + 1];
-            triIndex += 3;
+            addTriangle(bigIndexes[i],
+                        smallIndexes[smallIndex],
+                        bigIndexes[i + 1],
+                 triangles, !clockwise);
             if (i % step == 0 && i != 0 && smallIndex < smallIndexes.Length - 1)
             {
-                triangles[triIndex] = smallIndexes[smallIndex];
-                triangles[triIndex + tri1] = smallIndexes[smallIndex + 1];
-                triangles[triIndex + tri2] = bigIndexes[i + 1];
-                triIndex += 3;
+                addTriangle(smallIndexes[smallIndex],
+                            smallIndexes[smallIndex + 1],
+                            bigIndexes[i + 1],
+                     triangles, !clockwise);
                 smallIndex += 1;
             }
         }
         if (clockwise)
         {
-            triangles[triIndex] = smallIndexes[smallIndexes.Length - 2];
-            triangles[triIndex + tri1] = smallIndexes[smallIndexes.Length - 1]; //explose si
-            triangles[triIndex + tri2] = bigIndexes[bigIndexes.Length - 1];
-            triIndex += 3;
+            addTriangle(smallIndexes[smallIndexes.Length - 2],
+                        smallIndexes[smallIndexes.Length - 1],
+                        bigIndexes[bigIndexes.Length - 1],
+             triangles, !clockwise);         
         }
         #endregion
 
-        #region setheight
-        Vector3[] normals = new Vector3[vertices.Length];
+        #region outOfMeshVertex
+        //#region up
+        //for (int i = 0; i < resolutionUp + 1; i++) {
+        //    float ypct = (-size / 2.0f) + size/(resolutionUp - 1);
+        //    float xpct = ((i / (resolutionUp - 1.0f)) - 0.5f) * size;
 
-        for (int i = 0; i < vertices.Length; i++) {
-            float height = TerrainGenerator.simpleNoise.Evaluate(vertices[i]);
-            vertices[i].y = height;
-        }
+        //    float centerOffsetX = lodInfos.upCenter.x;
+        //    float centerOffsetY = lodInfos.upCenter.y;
+
+        //    Vector3 coords = new Vector3(xpct + centerOffsetX, 0, ypct + centerOffsetY);
+
+        //    GameObject o =GameObject.CreatePrimitive(PrimitiveType.Cube);
+        //    o.transform.parent = gameObject.transform;
+        //    o.transform.position = coords;
+        //    o.name = lodInfos.upCenter.ToString();
+        //    o.SetActive(false);
+        //}
+        //#endregion
+
+        //#region down
+        //for (int i = -1; i < resolutionDown; i++)
+        //{
+        //    float ypct = (size / 2.0f) - size / (resolutionDown - 1);
+        //    float xpct = ((i / (resolutionDown - 1.0f)) - 0.5f) * size;
+
+        //    float centerOffsetX = lodInfos.downCenter.x;
+        //    float centerOffsetY = lodInfos.downCenter.y;
+
+        //    Vector3 coords = new Vector3(xpct + centerOffsetX, 0, ypct + centerOffsetY);
+
+        //    GameObject o = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        //    o.transform.parent = gameObject.transform;
+        //    o.transform.position = coords;
+        //    o.name = lodInfos.upCenter.ToString();
+        //    o.SetActive(false);
+        //}
+        //#endregion
+
+        //#region right
+        //for (int i = -1; i < resolutionRight ; i++)
+        //{
+        //    float ypct = ((i / (resolutionRight - 1.0f)) - 0.5f) * size;
+        //    float xpct = (-size / 2.0f) + size / (resolutionRight - 1);
+
+        //    float centerOffsetX = lodInfos.rightCenter.x;
+        //    float centerOffsetY = lodInfos.rightCenter.y;
+
+        //    Vector3 coords = new Vector3(xpct + centerOffsetX, 0, ypct + centerOffsetY);
+
+        //    GameObject o = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        //    o.transform.parent = gameObject.transform;
+        //    o.transform.position = coords;
+        //    o.name = lodInfos.upCenter.ToString();
+        //    o.SetActive(false);
+        //}
+        //#endregion
+
+        //#region left
+        //for (int i = 0; i < resolutionLeft+1; i++)
+        //{
+        //    float ypct = ((i / (resolutionLeft - 1.0f)) - 0.5f) * size;
+        //    float xpct = (size / 2.0f) - size / (resolutionLeft - 1);
+
+        //    float centerOffsetX = lodInfos.leftCenter.x;
+        //    float centerOffsetY = lodInfos.leftCenter.y;
+
+        //    Vector3 coords = new Vector3(xpct + centerOffsetX, 0, ypct + centerOffsetY);
+
+        //    GameObject o = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        //    o.transform.parent = gameObject.transform;
+        //    o.transform.position = coords;
+        //    o.name = lodInfos.upCenter.ToString();
+        //    o.SetActive(false);
+        //}
+        //#endregion
+
+        //#endregion
+
+        //#region setheight
+        //Vector3[] normals = new Vector3[vertices.Length];
+
         #endregion
 
+        upIndexes = upIndexesList.ToArray();
+        downIndexes = downIndexesList.ToArray();
+        rightIndexes = rightIndexesList.ToArray();
+        leftIndexes = leftIndexesList.ToArray();
+
+        normals = RecalculateNormals(vertices, triangles); 
 
         return new FragmentMeshData(vertices, triangles, normals, lodInfos);
     }
 
-    public FragmentMeshData BuildMeshData_()
-    {
-        int resolution = terrain.resolutionsLevels[lodInfos.lodLevel];
-
-        Vector3[] vertices = new Vector3[resolution * resolution];
-        int[] triangles = new int[(resolution - 1) * (resolution - 1) * 6];
-        int triIndex = 0;
-
-        for (int j = 0; j < resolution; j++)
+    Vector3[] RecalculateNormals(Vector3[] vertices, int[] triangles) {
+        Vector3[] normals = new Vector3[vertices.Length];
+        for (int i = 0; i < triangles.Length - 2; i += 3)
         {
-            for (int i = 0; i < resolution; i++)
-            {
-                int index = i + j * resolution;
+            int ia = triangles[i];
+            int ib = triangles[i + 1];
+            int ic = triangles[i + 2];
 
-                float size = terrain.terrainSettings.fragmentSize;
-                float xpct = ((i / (resolution - 1.0f)) - 0.5f) * size;
-                float ypct = ((j / (resolution - 1.0f)) - 0.5f) * size;
+            Vector3 a = vertices[ia];
+            Vector3 b = vertices[ib];
+            Vector3 c = vertices[ic];
 
-                float centerOffsetX = lodInfos.center.x;
-                float centerOffsetY = lodInfos.center.y;
+            Vector3 ab = a - b;
+            Vector3 ac = a - c;
+            Vector3 normal = Vector3.Cross(ab, ac);
 
-                Vector3 coords = new Vector3(xpct + centerOffsetX, 0, ypct + centerOffsetY);
-                vertices[index] = coords;
+            normals[ia] += normal;
+            normals[ib] += normal;
+            normals[ic] += normal;
 
-                if (i < resolution - 1 && j < resolution - 1)
-                {
-                    triangles[triIndex] = index;
-                    triangles[triIndex + 2] = index + resolution + 1;
-                    triangles[triIndex + 1] = index + resolution;
+            normals[ia].Normalize();
+            normals[ib].Normalize();
+            normals[ic].Normalize();
+        }
+        return normals;
+    }
 
-                    triangles[triIndex + 3] = index;
-                    triangles[triIndex + 5] = index + 1;
-                    triangles[triIndex + 4] = index + resolution + 1;
-                    triIndex += 6;
-                }
-            }
+
+    public void RecalculateNormalsRight(TerrainFragment b)
+    {
+        for (int i = 0; i < rightIndexes.Length; i++) {
+            int index = rightIndexes[i];
+            int tIndex = b.leftIndexes[i];
+
+            Vector3 aNormal = normals[index];
+            Vector3 bNormal = b.normals[tIndex];
+
+            Vector3 normal = aNormal + bNormal;
+            normal.Normalize();
+            normals[index] = normal;
+            b.normals[tIndex] = normal;
+         }
+    }
+
+    public void RecalculateNormalsLeft(TerrainFragment b)
+    {
+        for (int i = 0; i < leftIndexes.Length; i++)
+        {
+            int index = leftIndexes[i];
+            int tIndex = b.rightIndexes[i];
+
+            Vector3 aNormal = normals[index];
+            Vector3 bNormal = b.normals[tIndex];
+
+            Vector3 normal = aNormal + bNormal;
+            normal.Normalize();
+            normals[index] = normal;
+            b.normals[tIndex] = normal;
+        }
+    }
+
+    public void RecalculateNormalsUp(TerrainFragment b)
+    {
+        for (int i = 0; i < upIndexes.Length; i++)
+        {
+            int index = upIndexes[i];
+            int tIndex = b.downIndexes[i];
+
+            Vector3 aNormal = normals[index];
+            Vector3 bNormal = b.normals[tIndex];
+
+            Vector3 normal = aNormal + bNormal;
+            normal.Normalize();
+            normals[index] = normal;
+            b.normals[tIndex] = normal;
         }
 
-        return new FragmentMeshData(vertices, triangles, new Vector3[vertices.Length], lodInfos);
     }
+
+    public void RecalculateNormalsDown(TerrainFragment b)
+    {
+        if (b.upIndexes.Length != downIndexes.Length)
+        {
+            Debug.Log("FUCK");
+        }
+
+        for (int i = 0; i < downIndexes.Length; i++)
+        {
+            int index = downIndexes[i];
+            int tIndex = b.upIndexes[i];
+
+            Vector3 aNormal = normals[index];
+            Vector3 bNormal = b.normals[tIndex];
+
+            Vector3 normal = aNormal + bNormal;
+            normal.Normalize();
+            normals[index] = normal;
+            b.normals[tIndex] = normal;
+        }
+
+    }
+
+    public void RecalculateNormalUpRight(TerrainFragment t) 
+    { 
+
+    }
+
+    public void RecalculateNormalUpLeft(TerrainFragment t)
+    {
+
+    }
+
+    public void RecalculateNormalDownRight(TerrainFragment t)
+    {
+    
+    }
+    public void RecalculateNormalDownLeft(TerrainFragment t)
+    {
+
+    }
+
 }
