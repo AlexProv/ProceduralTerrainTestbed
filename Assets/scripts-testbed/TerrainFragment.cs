@@ -418,11 +418,6 @@ public class TerrainFragment{
 
     public void RecalculateNormalsDown(TerrainFragment b)
     {
-        if (b.upIndexes.Length != downIndexes.Length)
-        {
-            Debug.Log("FUCK");
-        }
-
         for (int i = 0; i < downIndexes.Length; i++)
         {
             int index = downIndexes[i];
