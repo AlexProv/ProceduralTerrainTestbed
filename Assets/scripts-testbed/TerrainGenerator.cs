@@ -28,7 +28,7 @@ public class TerrainGenerator : MonoBehaviour
     [HideInInspector]
     //public readonly int[] resolutionsLevels = {240, 120, 60, 30, 15};
     //public readonly int[] resolutionsLevels = { 30, 10, 5};
-    public readonly int[] resolutionsLevels = {120, 60, 30, 15 };
+    public readonly int[] resolutionsLevels = {60, 30, 15 };
     public float[] lodThresholdsLevels;
 
     Dictionary<Vector2, TerrainFragment> visibleLastframeFragments;
@@ -238,22 +238,38 @@ public class TerrainGenerator : MonoBehaviour
 
         if(visibleFragments.TryGetValue(upCoords, out up)){
             //if(up.gameObject.active)
-                fragment.RecalculateNormalsUp(up);
+            try { fragment.RecalculateNormalsUp(up); }
+            catch(Exception e) {
+                Debug.Log(e);
+            }
+
         }
         if (visibleFragments.TryGetValue(downCoords, out down))
         {
             //if (down.gameObject.active)
-                fragment.RecalculateNormalsDown(down);
+            try { fragment.RecalculateNormalsDown(down); }
+            catch (Exception e)
+            {
+                Debug.Log(e);
+            }
         }
         if (visibleFragments.TryGetValue(rightCoords, out right))
         {
             //if (right.gameObject.active)
-                fragment.RecalculateNormalsRight(right);
+            try { fragment.RecalculateNormalsRight(right); }
+            catch (Exception e)
+            {
+                Debug.Log(e);
+            }
         }
         if (visibleFragments.TryGetValue(leftCoords, out left))
         {
             //if (up.gameObject.active)
-                fragment.RecalculateNormalsLeft(left);
+            try { fragment.RecalculateNormalsLeft(left); }
+            catch (Exception e)
+            {
+                Debug.Log(e);
+            }
         }
     }
 }

@@ -78,7 +78,6 @@ public class TerrainFragment{
         float size = terrain.terrainSettings.fragmentSize;
         #endregion
 
-
         #region mainmesh
         for (int j = 0; j < resolution-1; j++){
             for (int i = 0; i < resolution -1; i++){
@@ -110,13 +109,13 @@ public class TerrainFragment{
                 }
 
                 if (i < resolution - 2 && j < resolution - 2){
-                    addTriangle(index + 1,
-                                index,
-                                index + resolution - 1, 
-                        triangles, false);
-                    addTriangle(index + resolution - 1,
+                    addTriangle(index,
                                 index + resolution,
                                 index + 1,
+                        triangles, false);
+                    addTriangle(index + resolution,
+                                index,
+                                index + resolution - 1,
                         triangles, false);
                 }
                 index += 1;
@@ -125,7 +124,6 @@ public class TerrainFragment{
 
         downIndexesList.Add(index); //add last one to the down verts 
         #endregion
-
 
         #region rightStrip 
         int[] bigIndexes = rightInnerIndexesList.ToArray();
@@ -186,7 +184,7 @@ public class TerrainFragment{
         leftIndexesList.Add(index);
         #endregion
 
-        #region bottomStrip
+        #region upStrip
         bigIndexes = upInnerIndexesList.ToArray();
         smallIndexes = new int[resolutionUp];
 
@@ -242,89 +240,6 @@ public class TerrainFragment{
                         bigIndexes[bigIndexes.Length - 1],
              triangles, !clockwise);         
         }
-        #endregion
-
-        #region outOfMeshVertex
-        //#region up
-        //for (int i = 0; i < resolutionUp + 1; i++) {
-        //    float ypct = (-size / 2.0f) + size/(resolutionUp - 1);
-        //    float xpct = ((i / (resolutionUp - 1.0f)) - 0.5f) * size;
-
-        //    float centerOffsetX = lodInfos.upCenter.x;
-        //    float centerOffsetY = lodInfos.upCenter.y;
-
-        //    Vector3 coords = new Vector3(xpct + centerOffsetX, 0, ypct + centerOffsetY);
-
-        //    GameObject o =GameObject.CreatePrimitive(PrimitiveType.Cube);
-        //    o.transform.parent = gameObject.transform;
-        //    o.transform.position = coords;
-        //    o.name = lodInfos.upCenter.ToString();
-        //    o.SetActive(false);
-        //}
-        //#endregion
-
-        //#region down
-        //for (int i = -1; i < resolutionDown; i++)
-        //{
-        //    float ypct = (size / 2.0f) - size / (resolutionDown - 1);
-        //    float xpct = ((i / (resolutionDown - 1.0f)) - 0.5f) * size;
-
-        //    float centerOffsetX = lodInfos.downCenter.x;
-        //    float centerOffsetY = lodInfos.downCenter.y;
-
-        //    Vector3 coords = new Vector3(xpct + centerOffsetX, 0, ypct + centerOffsetY);
-
-        //    GameObject o = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        //    o.transform.parent = gameObject.transform;
-        //    o.transform.position = coords;
-        //    o.name = lodInfos.upCenter.ToString();
-        //    o.SetActive(false);
-        //}
-        //#endregion
-
-        //#region right
-        //for (int i = -1; i < resolutionRight ; i++)
-        //{
-        //    float ypct = ((i / (resolutionRight - 1.0f)) - 0.5f) * size;
-        //    float xpct = (-size / 2.0f) + size / (resolutionRight - 1);
-
-        //    float centerOffsetX = lodInfos.rightCenter.x;
-        //    float centerOffsetY = lodInfos.rightCenter.y;
-
-        //    Vector3 coords = new Vector3(xpct + centerOffsetX, 0, ypct + centerOffsetY);
-
-        //    GameObject o = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        //    o.transform.parent = gameObject.transform;
-        //    o.transform.position = coords;
-        //    o.name = lodInfos.upCenter.ToString();
-        //    o.SetActive(false);
-        //}
-        //#endregion
-
-        //#region left
-        //for (int i = 0; i < resolutionLeft+1; i++)
-        //{
-        //    float ypct = ((i / (resolutionLeft - 1.0f)) - 0.5f) * size;
-        //    float xpct = (size / 2.0f) - size / (resolutionLeft - 1);
-
-        //    float centerOffsetX = lodInfos.leftCenter.x;
-        //    float centerOffsetY = lodInfos.leftCenter.y;
-
-        //    Vector3 coords = new Vector3(xpct + centerOffsetX, 0, ypct + centerOffsetY);
-
-        //    GameObject o = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        //    o.transform.parent = gameObject.transform;
-        //    o.transform.position = coords;
-        //    o.name = lodInfos.upCenter.ToString();
-        //    o.SetActive(false);
-        //}
-        //#endregion
-
-        //#endregion
-
-        //#region setheight
-        //Vector3[] normals = new Vector3[vertices.Length];
-
         #endregion
 
         upIndexes = upIndexesList.ToArray();
@@ -448,6 +363,7 @@ public class TerrainFragment{
     {
     
     }
+
     public void RecalculateNormalDownLeft(TerrainFragment t)
     {
 
